@@ -80,6 +80,13 @@ class Pipeline(Generator, HFCompatible):
 
         pipeline_kwargs = self._gather_hf_params(hf_constructor=pipeline)
         self.generator = pipeline("text-generation", **pipeline_kwargs)
+        if self.generator.tokenizer is None:
+            # account for possible model without a stored tokenizer
+            from transformers import AutoTokenizer
+
+            self.generator.tokenizer = AutoTokenizer.from_pretrained(
+                pipeline_kwargs["model"]
+            )
         if not hasattr(self, "deprefix_prompt"):
             self.deprefix_prompt = self.name in models_to_deprefix
         if _config.loaded:
@@ -256,7 +263,7 @@ class InferenceAPI(Generator):
         self.name = name
         super().__init__(self.name, config_root=config_root)
 
-        self.uri = self.URI + name
+        self.uri = self.URI + self.name
 
         # special case for api token requirement this also reserves `headers` as not configurable
         if self.api_key:
@@ -376,7 +383,7 @@ class InferenceEndpoint(InferenceAPI):
 
     def __init__(self, name="", config_root=_config):
         super().__init__(name, config_root=config_root)
-        self.uri = name
+        self.uri = self.name
 
     @backoff.on_exception(
         backoff.fibo,
